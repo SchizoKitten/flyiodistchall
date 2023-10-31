@@ -51,7 +51,9 @@ impl Node{
         }
     }
 
-    fn send(&mut self, msg: Message){
+    fn send(&mut self, mut msg: Message){
+        self.message_count += 1;
+        msg.add("msg_id", self.message_count.to_string());
         let answer = msg.send();
         let _ = self.output.write_all(answer.as_bytes());
     }
@@ -114,6 +116,10 @@ impl Message{
         output.push_str("}\n");
         output
     }
+    
+    pub fn add(&mut self, key: &str, val: String){
+        self.body.insert(key.to_string(), val);
+    }
 }
 
 fn main() {
@@ -121,9 +127,14 @@ fn main() {
     let output = stdout();
     let mut n = Node::new(input, output);
     let key: &'static str = "\"echo\"";
-    n.handler(key, Box::new(|mut message_body|{
-        println!("echo msg");
-        println!("{:#?}", message_body); 
+    n.handler(key, Box::new(|message_body|{
+        eprintln!("{:#?}", message_body);
+        let type_ref = message_body.get_mut("type").unwrap();
+        *type_ref = "\"echo_ok\"".to_string();
+        message_body.insert(
+            "in_reply_to".to_string(),
+            message_body.get("msg_id").unwrap().to_string());
+        message_body.remove("msg_id");
     }));
     n.run();
 }
