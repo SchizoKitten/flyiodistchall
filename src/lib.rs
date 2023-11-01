@@ -23,7 +23,16 @@ impl Node{
             output,
             handlers: HashMap::new(),
         };
-        //let _message = Message::new(new.handle_message());
+        let mut message = Message::new(new.handle_message());
+        let mut_body_ref = message.get_body_mut_ref();
+        new.id = mut_body_ref.get("node_id").unwrap().to_string();
+        new.nodes = mut_body_ref.get("node_ids").unwrap().to_string();
+        let new_body: HashMap<String, String> = HashMap::from([
+            ("type".to_string(), "\"init_ok\"".to_string()),
+            ("in_reply_to".to_string(), mut_body_ref.get("msg_id").unwrap().to_string())
+        ]);
+        *mut_body_ref = new_body;
+        new.send(message);
         new
     }
 
@@ -44,7 +53,7 @@ impl Node{
                 continue;
             }
             let mut message = Message::new(message);
-            if let Some(handle) = self.handlers.get(dbg!(message.msg_type())){
+            if let Some(handle) = self.handlers.get(message.msg_type()){
                 handle(&mut message);
                 self.send(message);
             }else{
@@ -55,10 +64,10 @@ impl Node{
 
     //TODO: format send corectly
     fn send(&mut self, mut msg: Message){
-        self.message_count += 1;
         msg.add("msg_id", self.message_count.to_string());
         let answer = msg.send();
-        let _ = self.output.write_all(answer.as_bytes());
+        let _ = writeln!(self.output, "{}",answer);
+        self.message_count += 1;
     }
 }
 
@@ -104,12 +113,12 @@ impl Message{
                 (key, val)
             })
             .collect();
-        dbg!(Message{
+        Message{
             src,
             dest,
             r#type,
             body,
-        })
+        }
     }
 
     pub fn msg_type(&self) -> &str{
@@ -124,18 +133,19 @@ impl Message{
         &mut self.body
     }
     
+    pub fn get_body_ref(&self) -> &HashMap<String, String>{
+        &self.body
+    }
+
     //TODO:format corectly
     pub fn send(self) -> String{
         let mut output = String::new();
-        output.push_str("{\n");
-        output.push_str(&format!("  \"{}\": \"{}\",\n", "scr", self.dest));
-        output.push_str(&format!("  \"{}\": \"{}\",\n", "dest", self.src));
-        output.push_str("  \"body\": {\n");
+        output.push_str(&format!("{{\"{}\":\"{}\",\"{}\":\"{}\",\"body\":{{", "src", self.dest, "dest", self.src));
         for (key, val) in self.body{
-            output.push_str(&format!("    \"{}\": {},\n", key, val));
+            output.push_str(&format!("\"{}\":{},", key, val));
         }
-        output.push_str("  }\n");
-        output.push_str("}\n");
+        output.pop();
+        output.push_str("}}");
         output
     }
     

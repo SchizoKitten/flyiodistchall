@@ -5,9 +5,9 @@ fn main() {
     let input = stdin();
     let output = stdout();
     let mut n = Node::new(input, output);
-    let key: &'static str = "\"echo\"";
+    let key: &'static str = "echo";
     n.handler(key, Box::new(|message|{
-        message.set_type("\"echo_ok\"".to_string());
+        message.set_type("echo_ok".to_string());
         let body = message.get_body_mut_ref();
         body.insert(
             "in_reply_to".to_string(),
