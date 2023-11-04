@@ -13,7 +13,6 @@ pub struct Node{
 }
 
 impl Node{
-    //TODO: finish recieving init msg
     pub fn new(input: Stdin, output: Stdout) -> Node{
         let mut new = Node{
             id: String::new(),
@@ -62,7 +61,6 @@ impl Node{
         }
     }
 
-    //TODO: format send corectly
     fn send(&mut self, mut msg: Message){
         msg.add("msg_id", self.message_count.to_string());
         let answer = msg.send();
@@ -80,7 +78,6 @@ pub struct Message{
 }
 
 impl Message{
-    //TODO: fix this
     pub fn new(input: String) -> Message{
         let mut input = input.split(',');
         input.next();
@@ -134,7 +131,6 @@ impl Message{
         &self.body
     }
 
-    //TODO:format corectly
     pub fn send(self) -> String{
         let mut output = String::new();
         output.push_str(&format!("{{\"{}\":\"{}\",\"{}\":\"{}\",\"body\":{{", "src", self.dest, "dest", self.src));
