@@ -9,7 +9,7 @@ pub struct Node{
     message_count: usize,
     input: Stdin,
     output: Stdout,
-    handlers: HashMap<&'static str, Box<dyn Fn(&mut Message)>>,
+    handlers: HashMap<&'static str, Box<dyn FnMut(&mut Message)>>,
 }
 
 impl Node{
@@ -36,7 +36,7 @@ impl Node{
         new
     }
 
-    pub fn handler(&mut self, key: &'static str, f: Box<dyn Fn(&mut Message)>){
+    pub fn handler(&mut self, key: &'static str, f: Box<dyn FnMut(&mut Message)>){
         self.handlers.insert(key, f);
     }
 
@@ -53,7 +53,7 @@ impl Node{
                 continue;
             }
             let mut message = Message::new(message);
-            if let Some(handle) = self.handlers.get(message.msg_type()){
+            if let Some(handle) = self.handlers.get_mut(message.get_body_ref().get("type").unwrap().as_str()){
                 handle(&mut message);
                 self.send(message);
             }else{
@@ -66,6 +66,7 @@ impl Node{
     fn send(&mut self, mut msg: Message){
         msg.add("msg_id", self.message_count.to_string());
         let answer = msg.send();
+        eprintln!("{:#?}", answer);
         let _ = writeln!(self.output, "{}",answer);
         self.message_count += 1;
     }
@@ -75,7 +76,6 @@ impl Node{
 pub struct Message{
     src: String,
     dest: String,
-    r#type: String,
     body: HashMap<String, String>,
 }
 
@@ -94,13 +94,18 @@ impl Message{
             .skip_while(|&char| char != 'n')
             .take_while(|&char| char != '"')
             .collect();
-        let r#type: String = input.next().unwrap()
-            .chars().skip_while(|&char| char != ':')
-            .skip(1)
-            .skip_while(|&char| char != ':')
-            .skip(1)
-            .collect();
-        let body: HashMap<String, String> = input
+        let f_body_el: (String, String) = {
+            let mut temp = input.next().unwrap()
+                .chars();
+            let key: String = temp.by_ref()
+                .skip_while(|&char| char != '{')
+                .skip(2)
+                .take_while(|&char| char != '"')
+                .collect();
+            let val: String = temp.skip(1).collect();
+            (key, val)
+        };
+        let mut body: HashMap<String, String> = input
             .map(|line| {
                 let mut temp = line.trim().trim_end_matches('}').chars();
                 let key: String = temp.by_ref()
@@ -113,20 +118,12 @@ impl Message{
                 (key, val)
             })
             .collect();
+        body.insert(f_body_el.0, f_body_el.1);
         Message{
             src,
             dest,
-            r#type,
             body,
         }
-    }
-
-    pub fn msg_type(&self) -> &str{
-        &self.r#type
-    }
-
-    pub fn set_type(&mut self, set: String){
-       self.r#type = set;
     }
     
     pub fn get_body_mut_ref(&mut self) -> &mut HashMap<String, String>{
