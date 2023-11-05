@@ -122,6 +122,10 @@ impl Message{
             body,
         }
     }
+
+    pub fn get_dest(&self) -> String{
+        self.dest.clone()
+    }
     
     pub fn get_body_mut_ref(&mut self) -> &mut HashMap<String, String>{
         &mut self.body

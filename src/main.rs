@@ -19,7 +19,8 @@ fn main() {
     n.handler(key, Box::new(move |message|{
         let mut new_body: HashMap<String, String> = HashMap::new();
         new_body.insert("type".to_string(), "\"generate_ok\"".to_string());
-        new_body.insert("id".to_string(), counter.to_string());
+        new_body.insert("id".to_string(),
+            format!("\"{}{}\"", message.get_dest(), counter));
         new_body.insert(
             "in_reply_to".to_string(),
             message.get_body_ref().get("msg_id").unwrap().to_string());
