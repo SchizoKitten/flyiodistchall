@@ -1,7 +1,10 @@
 use std::{
+    cell::RefCell,
     io::{Stdout, Stdin, Write},
     collections::HashMap
 };
+
+type Handler = Box<dyn FnMut(&mut Message, &mut Vec<i32>)>;
 
 pub struct Node{
     id: String,
@@ -9,7 +12,8 @@ pub struct Node{
     message_count: usize,
     input: Stdin,
     output: Stdout,
-    handlers: HashMap<&'static str, Box<dyn FnMut(&mut Message)>>,
+    handlers: RefCell<HashMap<&'static str, Handler>>,
+    broadcast: RefCell<Vec<i32>>,
 }
 
 impl Node{
@@ -20,7 +24,8 @@ impl Node{
             message_count: 0,
             input,
             output,
-            handlers: HashMap::new(),
+            handlers: RefCell::new(HashMap::new()),
+            broadcast: RefCell::new(Vec::new()),
         };
         let mut message = Message::new(new.handle_message());
         let mut_body_ref = message.get_body_mut_ref();
@@ -35,8 +40,8 @@ impl Node{
         new
     }
 
-    pub fn handler(&mut self, key: &'static str, f: Box<dyn FnMut(&mut Message)>){
-        self.handlers.insert(key, f);
+    pub fn handler(&mut self, key: &'static str, f: Handler){
+        self.handlers.borrow_mut().insert(key, f);
     }
 
     fn handle_message(&mut self) -> String{
@@ -52,12 +57,12 @@ impl Node{
                 continue;
             }
             let mut message = Message::new(message);
-            if let Some(handle) = self.handlers.get_mut(message.get_body_ref().get("type").unwrap().as_str()){
-                handle(&mut message);
-                self.send(message);
+            if let Some(handle) = self.handlers.borrow_mut().get_mut(message.get_body_ref().get("type").unwrap().as_str()){
+                handle(&mut message, &mut self.broadcast.borrow_mut());
             }else{
                 panic!("No handle");
             }
+            self.send(message);
         }
     }
 
