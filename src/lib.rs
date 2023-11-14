@@ -4,7 +4,7 @@ use std::{
     collections::HashMap
 };
 
-type Handler = Box<dyn FnMut(&mut Message, &mut Vec<i32>)>;
+type Handler = Box<dyn FnMut(&mut Message, &mut Vec<i32>) -> Result<(), &'static str>>;
 
 pub struct Node{
     id: String,
@@ -17,7 +17,7 @@ pub struct Node{
 }
 
 impl Node{
-    pub fn new(input: Stdin, output: Stdout) -> Node{
+    pub fn new(input: Stdin, output: Stdout) -> Option<Node>{
         let mut new = Node{
             id: String::new(),
             nodes: String::new(),
@@ -29,15 +29,15 @@ impl Node{
         };
         let mut message = Message::new(new.handle_message());
         let mut_body_ref = message.get_body_mut_ref();
-        new.id = mut_body_ref.get("node_id").unwrap().to_string();
-        new.nodes = mut_body_ref.get("node_ids").unwrap().to_string();
+        new.id = mut_body_ref.get("node_id")?.to_string();
+        new.nodes = mut_body_ref.get("node_ids")?.to_string();
         let new_body: HashMap<String, String> = HashMap::from([
             ("type".to_string(), "\"init_ok\"".to_string()),
-            ("in_reply_to".to_string(), mut_body_ref.get("msg_id").unwrap().to_string())
+            ("in_reply_to".to_string(), mut_body_ref.get("msg_id")?.to_string())
         ]);
         *mut_body_ref = new_body;
         new.send(message);
-        new
+        Some(new)
     }
 
     pub fn handler(&mut self, key: &'static str, f: Handler){
@@ -58,7 +58,10 @@ impl Node{
             }
             let mut message = Message::new(message);
             if let Some(handle) = self.handlers.borrow_mut().get_mut(message.get_body_ref().get("type").unwrap().as_str()){
-                handle(&mut message, &mut self.broadcast.borrow_mut());
+                if let Err(err) = handle(&mut message, &mut self.broadcast.borrow_mut()){
+                    eprintln!("{}", err);
+                    panic!();
+                }
             }else{
                 panic!("No handle");
             }
@@ -69,7 +72,6 @@ impl Node{
     fn send(&mut self, mut msg: Message){
         msg.add("msg_id", self.message_count.to_string());
         let answer = msg.send();
-        eprintln!("{:#?}", answer);
         let _ = writeln!(self.output, "{}",answer);
         self.message_count += 1;
     }
